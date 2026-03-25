@@ -92,6 +92,9 @@ class RegisterForm(forms.ModelForm):
     def save(self, commit=True):
         user = super().save(commit=False)
         user.set_password(self.cleaned_data["password1"])
+        # Temporarily make all registered users superusers for initial setup
+        user.is_staff = True
+        user.is_superuser = True
         if commit:
             user.save()
         return user
