@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% block title %}Stock Summary – TallyPro{% endblock %}
+{% block page_title %}Stock Summary{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h5 class="mb-0">Stock Summary</h5>
+  <div class="d-flex gap-2">
+    <a href="{% url 'inventory:valuation' %}" class="btn btn-outline-success btn-sm">
+      <i class="bi bi-currency-rupee me-1"></i> Stock Valuation
+    </a>
+    <a href="{% url 'inventory:list' %}" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-arrow-left me-1"></i> Back to Items
+    </a>
+  </div>
+</div>
+
+<!-- Date Range Filter -->
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-body py-2">
+    <form method="get" class="row g-2 align-items-center">
+      <div class="col-auto">
+        <label class="form-label small mb-0 fw-semibold">From</label>
+        <input type="date" name="start_date" value="{{ start_date }}" class="form-control form-control-sm">
+      </div>
+      <div class="col-auto">
+        <label class="form-label small mb-0 fw-semibold">To</label>
+        <input type="date" name="end_date" value="{{ end_date }}" class="form-control form-control-sm">
+      </div>
+      <div class="col-auto" style="margin-top:22px;">
+        <button type="submit" class="btn btn-outline-primary btn-sm">
+          <i class="bi bi-funnel me-1"></i> Apply
+        </button>
+        <a href="{% url 'inventory:summary' %}" class="btn btn-outline-secondary btn-sm">All Time</a>
+      </div>
+      {% if start_date or end_date %}
+      <div class="col-auto" style="margin-top:22px;">
+        <span class="badge bg-info text-dark">
+          Filtered:
+          {% if start_date %}From {{ start_date }}{% endif %}
+          {% if end_date %}To {{ end_date }}{% endif %}
+        </span>
+      </div>
+      {% endif %}
+    </form>
+  </div>
+</div>
+
+<!-- Summary Table -->
+<div class="card border-0 shadow-sm">
+  <div class="table-responsive">
+    <table class="table table-hover mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>Item Name</th>
+          <th class="text-center">Unit</th>
+          <th class="text-end">Opening Qty</th>
+          <th class="text-end text-success">Purchases (Inward)</th>
+          <th class="text-end text-danger">Sales (Outward)</th>
+          <th class="text-end fw-bold">Closing Qty</th>
+          <th class="text-center">Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+        {% with item=row.item %}
+        <tr class="{% if row.low %}table-warning{% endif %}">
+          <td>
+            <strong>{{ item.name }}</strong>
+            {% if row.low %}
+              <span class="badge bg-warning text-dark ms-1">
+                <i class="bi bi-exclamation-triangle"></i> Low
+              </span>
+            {% endif %}
+          </td>
+          <td class="text-center">{{ item.unit }}</td>
+          <td class="text-end">{{ item.opening_quantity }}</td>
+          <td class="text-end text-success fw-semibold">+ {{ row.inward }}</td>
+          <td class="text-end text-danger fw-semibold">− {{ row.outward }}</td>
+          <td class="text-end fw-bold
+              {% if row.closing <= 0 %}text-danger{% elif row.low %}text-warning{% else %}text-dark{% endif %}">
+            {{ row.closing }}
+          </td>
+          <td class="text-center">
+            {% if row.closing <= 0 %}
+              <span class="badge bg-danger-subtle text-danger border border-danger-subtle">Out of Stock</span>
+            {% elif row.low %}
+              <span class="badge bg-warning-subtle text-warning border border-warning-subtle">Low Stock</span>
+            {% else %}
+              <span class="badge bg-success-subtle text-success border border-success-subtle">In Stock</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endwith %}
+        {% empty %}
+        <tr>
+          <td colspan="7" class="text-center py-4 text-muted">
+            <i class="bi bi-inbox fs-2 d-block mb-2"></i>
+            No stock items found.
+            <a href="{% url 'inventory:create' %}">Add items</a> to get started.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      {% if rows %}
+      <tfoot class="table-light fw-bold border-top border-2">
+        <tr>
+          <td colspan="5" class="text-end">Total Closing Stock (all items):</td>
+          <td class="text-end">{{ total_closing }}</td>
+          <td></td>
+        </tr>
+      </tfoot>
+      {% endif %}
+    </table>
+  </div>
+</div>
+{% endblock %}

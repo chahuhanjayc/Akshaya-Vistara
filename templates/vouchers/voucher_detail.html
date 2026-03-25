@@ -1,0 +1,337 @@
+{% extends "base.html" %}
+{% block title %}{{ voucher.number }} – TallyPro{% endblock %}
+{% block page_title %}Voucher Detail{% endblock %}
+
+{% block extra_head %}
+<style>
+/* ── Print layout ── */
+@media print {
+  #sidebar, #topbar, .no-print, .btn { display: none !important; }
+  #main-content { margin-left: 0 !important; }
+  .page-body { padding: 0 !important; }
+  .card { border: 1px solid #dee2e6 !important; box-shadow: none !important; }
+  body { background: white !important; font-size: 11pt; }
+  .print-show { display: block !important; }
+}
+.print-show { display: none; }   /* hidden on screen, shown in print */
+
+/* ── Audit log ── */
+.audit-row td { font-size: 0.80rem; vertical-align: middle; }
+.audit-action-create { color: #0a3622; background: #d1e7dd; }
+.audit-action-update { color: #084298; background: #cfe2ff; }
+.audit-action-delete { color: #58151c; background: #f8d7da; }
+
+/* ── Pay Now / QR card ── */
+.pay-now-card {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 0.75rem;
+  color: #fff;
+  padding: 1.25rem;
+  text-align: center;
+}
+.pay-now-card .card-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  opacity: 0.75;
+  margin-bottom: 0.5rem;
+}
+.pay-now-card .amount {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-bottom: 0.75rem;
+  letter-spacing: 0.02em;
+}
+.pay-now-card .qr-wrap {
+  background: #fff;
+  border-radius: 0.5rem;
+  display: inline-block;
+  padding: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+.pay-now-card .qr-wrap img { display: block; width: 160px; height: 160px; }
+.pay-now-card .upi-id {
+  font-size: 0.82rem;
+  opacity: 0.85;
+  word-break: break-all;
+}
+
+/* ── Simulate payment button ── */
+.btn-simulate {
+  background: rgba(255,255,255,0.18);
+  border: 1px solid rgba(255,255,255,0.4);
+  color: #fff;
+  font-size: 0.82rem;
+  border-radius: 0.4rem;
+  padding: 0.35rem 0.9rem;
+  transition: background 0.15s;
+}
+.btn-simulate:hover {
+  background: rgba(255,255,255,0.3);
+  color: #fff;
+}
+
+/* ── Print QR placeholder ── */
+.print-qr-section {
+  border-top: 1px dashed #adb5bd;
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row g-3">
+
+  {# ════════════════════════════════════════
+     LEFT — Voucher card
+     ════════════════════════════════════════ #}
+  <div class="col-lg-8">
+
+    <div class="card border-0 shadow-sm mb-3">
+
+      {# ── Card header ── #}
+      <div class="card-header bg-white d-flex justify-content-between align-items-center py-2">
+        <div>
+          <span class="fw-bold me-2"><code>{{ voucher.number }}</code></span>
+          <span class="badge bg-secondary bg-opacity-10 text-secondary">{{ voucher.voucher_type }}</span>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+          {% if voucher.is_balanced %}
+            <span class="badge badge-balanced">✓ Balanced</span>
+          {% else %}
+            <span class="badge badge-unbalanced">! Unbalanced</span>
+          {% endif %}
+          <span class="text-muted small">{{ voucher.date|date:"d M Y" }}</span>
+        </div>
+      </div>
+
+      <div class="card-body">
+
+        {# ── Meta fields ── #}
+        <dl class="row mb-3" style="font-size:0.87rem;">
+          <dt class="col-sm-3 text-muted">Company</dt>
+          <dd class="col-sm-9">{{ voucher.company.name }}</dd>
+          <dt class="col-sm-3 text-muted">Date</dt>
+          <dd class="col-sm-9">{{ voucher.date|date:"l, d M Y" }}</dd>
+          {% if voucher.narration %}
+          <dt class="col-sm-3 text-muted">Narration</dt>
+          <dd class="col-sm-9">{{ voucher.narration }}</dd>
+          {% endif %}
+          {% if voucher.due_date %}
+          <dt class="col-sm-3 text-muted">Due Date</dt>
+          <dd class="col-sm-9 {% if voucher.due_date < today %}text-danger fw-semibold{% endif %}">
+            {{ voucher.due_date|date:"d M Y" }}
+            {% if voucher.due_date < today %}
+              <span class="badge badge-unbalanced ms-1">Overdue</span>
+            {% endif %}
+          </dd>
+          {% endif %}
+        </dl>
+
+        {# ── Line items table ── #}
+        <div class="table-responsive">
+        <table class="table table-bordered table-sm">
+          <thead class="table-light">
+            <tr>
+              <th>Ledger Account</th>
+              <th class="text-end">Debit (₹)</th>
+              <th class="text-end">Credit (₹)</th>
+              <th>Particulars</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in voucher.items.all %}
+            <tr>
+              <td class="fw-semibold">{{ item.ledger.name }}</td>
+              <td class="text-end font-monospace">
+                {% if item.debit %}{{ item.debit|floatformat:2 }}{% else %}—{% endif %}
+              </td>
+              <td class="text-end font-monospace">
+                {% if item.credit %}{{ item.credit|floatformat:2 }}{% else %}—{% endif %}
+              </td>
+              <td class="text-muted small">{{ item.narration }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+          <tfoot>
+            <tr class="fw-bold table-light">
+              <td>Total</td>
+              <td class="text-end font-monospace">{{ voucher.total_debit|floatformat:2 }}</td>
+              <td class="text-end font-monospace">{{ voucher.total_credit|floatformat:2 }}</td>
+              <td></td>
+            </tr>
+          </tfoot>
+        </table>
+        </div>{# /table-responsive #}
+
+        {# ── Action buttons ── #}
+        <div class="d-flex flex-wrap gap-2 mt-3 no-print">
+          {% if current_company_role != "Viewer" %}
+          <a href="{% url 'vouchers:edit' voucher.pk %}" class="btn btn-primary btn-sm">
+            <i class="bi bi-pencil me-1"></i>Edit
+          </a>
+          {% endif %}
+          {% if current_company_role == "Admin" %}
+          <a href="{% url 'vouchers:delete' voucher.pk %}" class="btn btn-outline-danger btn-sm">
+            <i class="bi bi-trash me-1"></i>Delete
+          </a>
+          {% endif %}
+          <button onclick="window.print()" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-printer me-1"></i>Print
+          </button>
+          <a href="{% url 'vouchers:invoice_pdf' voucher.pk %}?download=1"
+             class="btn btn-outline-danger btn-sm" target="_blank">
+            <i class="bi bi-file-earmark-pdf me-1"></i>Download PDF
+          </a>
+          <a href="{% url 'vouchers:list' %}" class="btn btn-outline-secondary btn-sm ms-auto">
+            <i class="bi bi-arrow-left me-1"></i>Back
+          </a>
+        </div>
+
+        {# ── Print-only QR section (bottom of invoice on paper) ── #}
+        {% if qr_code %}
+        <div class="print-qr-section print-show">
+          <div style="display:flex; gap:1.5rem; align-items:flex-start;">
+            <div>
+              <img src="data:image/png;base64,{{ qr_code }}"
+                   alt="UPI QR"
+                   style="width:120px; height:120px; display:block;">
+            </div>
+            <div style="font-size:10pt;">
+              <div style="font-weight:700; margin-bottom:0.25rem;">Pay via UPI</div>
+              <div>UPI ID: <strong>{{ voucher.company.upi_id }}</strong></div>
+              <div>Amount: <strong>₹{{ voucher.total_debit|floatformat:2 }}</strong></div>
+              <div style="color:#555; margin-top:0.25rem;">Ref: {{ voucher.number }}</div>
+              {% if voucher.company.bank_name %}
+              <div style="margin-top:0.5rem; color:#555;">
+                Bank: {{ voucher.company.bank_name }}
+                {% if voucher.company.ifsc_code %} · {{ voucher.company.ifsc_code }}{% endif %}
+              </div>
+              {% endif %}
+              {% if voucher.company.account_number %}
+              <div style="color:#555;">A/C: {{ voucher.company.account_number }}</div>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+        {% elif voucher.company.bank_name or voucher.company.account_number %}
+        {# Print-only bank details (when no UPI QR) #}
+        <div class="print-qr-section print-show">
+          <div style="font-size:10pt;">
+            <div style="font-weight:700; margin-bottom:0.25rem;">Bank Transfer Details</div>
+            {% if voucher.company.bank_name %}
+            <div>Bank: {{ voucher.company.bank_name }}</div>
+            {% endif %}
+            {% if voucher.company.account_number %}
+            <div>Account: {{ voucher.company.account_number }}</div>
+            {% endif %}
+            {% if voucher.company.ifsc_code %}
+            <div>IFSC: {{ voucher.company.ifsc_code }}</div>
+            {% endif %}
+          </div>
+        </div>
+        {% endif %}
+
+      </div>
+    </div>
+
+  </div>
+
+  {# ════════════════════════════════════════
+     RIGHT — Sidebar panels
+     ════════════════════════════════════════ #}
+  <div class="col-lg-4">
+
+    {# ── Pay Now / UPI QR card (Sales vouchers only) ── #}
+    {% if qr_code %}
+    <div class="pay-now-card mb-3 no-print">
+      <div class="card-label">Pay Now via UPI</div>
+      <div class="amount">₹{{ voucher.total_debit|floatformat:2 }}</div>
+      <div class="qr-wrap">
+        <img src="data:image/png;base64,{{ qr_code }}"
+             alt="UPI Payment QR — {{ voucher.company.upi_id }}">
+      </div>
+      <div class="upi-id mb-2">{{ voucher.company.upi_id }}</div>
+
+      {# Simulate Payment button (Admin / Accountant only) #}
+      {% if current_company_role != "Viewer" %}
+      <form method="post"
+            action="{% url 'vouchers:simulate_payment' voucher.pk %}"
+            onsubmit="return confirm('Simulate payment? This will create a Receipt Voucher automatically.');">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-simulate w-100 mt-1">
+          <i class="bi bi-lightning-charge-fill me-1"></i>Simulate Payment
+        </button>
+      </form>
+      {% endif %}
+    </div>
+    {% elif voucher.voucher_type == "Sales" %}
+    {# Sales voucher but no UPI configured — show prompt #}
+    <div class="card border-0 shadow-sm mb-3 no-print">
+      <div class="card-body text-center py-4">
+        <i class="bi bi-qr-code-scan d-block mb-2 text-muted" style="font-size:2rem;"></i>
+        <div class="text-muted" style="font-size:0.83rem;">
+          No UPI ID configured.
+          {% if current_company_role == "Admin" %}
+          <a href="{% url 'core:company_settings' %}">Add one in Company Settings</a>
+          to enable the Pay-Now QR code.
+          {% else %}
+          Ask your Admin to configure a UPI ID.
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    {# ── Audit / Activity log ── #}
+    <div class="card border-0 shadow-sm no-print">
+      <div class="card-header bg-white py-2">
+        <h6 class="mb-0 d-flex align-items-center gap-2">
+          <i class="bi bi-clock-history text-muted"></i>
+          Activity Log
+        </h6>
+      </div>
+      <div class="card-body p-0">
+        {% if audit_logs %}
+        <div class="table-responsive">
+        <table class="table table-sm mb-0">
+          <tbody>
+            {% for log in audit_logs %}
+            <tr class="audit-row">
+              <td style="width:28px; padding-left:0.75rem;">
+                <span class="badge audit-action-{{ log.action }}" title="{{ log.action|capfirst }}">
+                  {% if log.action == "create" %}+
+                  {% elif log.action == "update" %}✎
+                  {% else %}✕{% endif %}
+                </span>
+              </td>
+              <td>
+                <div class="fw-semibold" style="font-size:0.8rem;">
+                  {{ log.user.get_full_name|default:log.user.username|default:"System" }}
+                </div>
+                <div class="text-muted" style="font-size:0.75rem;">
+                  {{ log.action|capfirst }}d &middot; {{ log.timestamp|date:"d M Y, H:i" }}
+                  {% if log.extra.simulated_from %}
+                  <br><span class="text-primary">Auto: {{ log.extra.simulated_from }}</span>
+                  {% endif %}
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        </div>{# /table-responsive #}
+        {% else %}
+        <div class="text-center text-muted py-4" style="font-size:0.85rem;">
+          <i class="bi bi-clock-history d-block mb-1" style="font-size:1.5rem;opacity:.35;"></i>
+          No activity recorded yet.
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+  </div>
+
+</div>
+{% endblock %}

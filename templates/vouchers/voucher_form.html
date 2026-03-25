@@ -1,0 +1,597 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} – TallyPro{% endblock %}
+{% block page_title %}{{ title }}{% endblock %}
+
+{% block extra_head %}
+<style>
+  .item-row td { vertical-align: middle; }
+  .total-row td { font-weight: 600; border-top: 2px solid #dee2e6; }
+  .balanced-ok   { color: #16a34a; font-weight: 700; }
+  .balanced-fail { color: #dc2626; font-weight: 700; }
+  .delete-btn { cursor: pointer; }
+
+  /* Quick-add button next to ledger selects */
+  .ledger-wrap { display: flex; gap: 4px; align-items: center; }
+  .ledger-wrap select { flex: 1; }
+  .quick-add-btn {
+    flex-shrink: 0;
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    background: #0d6efd;
+    color: #fff;
+    border: none;
+    font-size: 1rem;
+    line-height: 1;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: background .15s;
+    padding: 0;
+  }
+  .quick-add-btn:hover { background: #0b5ed7; }
+
+  /* ref-voucher col — compact */
+  .ref-voucher-select { font-size: .78rem !important; }
+
+  /* ── Stock Items Section ── */
+  .stock-row td { vertical-align: middle; }
+  .stock-amount-cell { font-weight: 600; color: #0d6efd; }
+  #stockItemsSection {
+    border: 1px solid #d1fae5;
+    border-radius: .5rem;
+    background: #f0fdf4;
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+  }
+  #stockItemsSection h6 {
+    color: #065f46;
+    font-weight: 700;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="card border-0 shadow-sm">
+  <div class="card-header bg-white py-3 d-flex justify-content-between">
+    <h6 class="mb-0">{{ title }}</h6>
+    {% if voucher %}<code class="text-muted">{{ voucher.number }}</code>{% endif %}
+  </div>
+  <div class="card-body">
+
+    <form method="post" id="voucherForm" novalidate>
+      {% csrf_token %}
+
+      <!-- ── Voucher Header ── -->
+      <div class="row g-3 mb-4">
+        <div class="col-md-3">
+          <label class="form-label fw-semibold">Date</label>
+          {{ form.date }}
+          {% if form.date.errors %}<div class="text-danger small">{{ form.date.errors.0 }}</div>{% endif %}
+        </div>
+        <div class="col-md-3">
+          <label class="form-label fw-semibold">
+            Due Date <small class="text-muted fw-normal">(optional)</small>
+          </label>
+          {{ form.due_date }}
+        </div>
+        <div class="col-md-3">
+          <label class="form-label fw-semibold">Voucher Type</label>
+          {{ form.voucher_type }}
+          {% if form.voucher_type.errors %}<div class="text-danger small">{{ form.voucher_type.errors.0 }}</div>{% endif %}
+        </div>
+        <div class="col-md-3">
+          <label class="form-label fw-semibold">Narration</label>
+          {{ form.narration }}
+        </div>
+      </div>
+
+      <!-- ══════════════════════════════════════════════════
+           STOCK ITEMS SECTION (shown for Sales & Purchase)
+           ══════════════════════════════════════════════════ -->
+      <div id="stockItemsSection">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <h6 class="mb-0">
+            <i class="bi bi-boxes me-1"></i> Stock Items
+            <small class="fw-normal text-muted">(optional — for inventory tracking)</small>
+          </h6>
+          <span class="badge bg-success-subtle text-success border border-success-subtle">
+            Inventory
+          </span>
+        </div>
+
+        {% if stock_formset %}
+        {{ stock_formset.management_form }}
+        <div class="table-responsive">
+          <table class="table table-sm table-bordered mb-1" id="stockTable">
+            <thead class="table-success">
+              <tr>
+                <th style="width:40%">Stock Item</th>
+                <th style="width:16%">Qty</th>
+                <th style="width:18%">Rate (₹)</th>
+                <th style="width:18%" class="text-end">Amount (₹)</th>
+                <th style="width:36px;"></th>
+              </tr>
+            </thead>
+            <tbody id="stockBody">
+              {% for sf in stock_formset %}
+              <tr class="stock-row" id="stock-row-{{ forloop.counter0 }}">
+                <td>
+                  {{ sf.id }}
+                  {{ sf.stock_item }}
+                  {% if sf.stock_item.errors %}<div class="text-danger small">{{ sf.stock_item.errors.0 }}</div>{% endif %}
+                </td>
+                <td>{{ sf.quantity }}</td>
+                <td>{{ sf.rate }}</td>
+                <td class="text-end stock-amount-cell" id="stock-amt-{{ forloop.counter0 }}">—</td>
+                <td class="text-center">
+                  {% if sf.DELETE %}
+                    {{ sf.DELETE }}
+                  {% else %}
+                    <button type="button" class="btn btn-sm btn-outline-danger"
+                            onclick="removeStockRow(this)">
+                      <i class="bi bi-x"></i>
+                    </button>
+                  {% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+            <tfoot>
+              <tr class="table-success">
+                <td colspan="3" class="text-end fw-semibold">Stock Items Total:</td>
+                <td class="text-end fw-bold text-success" id="stockTotalAmount">₹0.00</td>
+                <td></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+        <button type="button" class="btn btn-outline-success btn-sm" id="addStockRowBtn">
+          <i class="bi bi-plus-circle me-1"></i> Add Stock Item Row
+        </button>
+        {% else %}
+        <p class="text-muted small mb-0">
+          <i class="bi bi-info-circle me-1"></i>
+          Stock item tracking is available for Sales and Purchase vouchers.
+          <a href="{% url 'inventory:create' %}" target="_blank">Add stock items</a> first.
+        </p>
+        {% endif %}
+      </div>
+
+      <!-- ── Voucher Items ── -->
+      {{ formset.management_form }}
+
+      <div class="table-responsive mb-2">
+        <table class="table table-bordered" id="itemsTable">
+          <thead class="table-light">
+            <tr>
+              <th style="width:30%">
+                Ledger Account
+                <span class="text-muted fw-normal" style="font-size:.75rem;">
+                  — <i class="bi bi-plus-circle text-primary"></i> to add new
+                </span>
+              </th>
+              <th class="text-end" style="width:11%">Debit (₹)</th>
+              <th class="text-end" style="width:11%">Credit (₹)</th>
+              <th style="width:16%">Note</th>
+              <th style="width:22%">Against Invoice <small class="text-muted fw-normal">(optional)</small></th>
+              <th style="width:36px;"></th>
+            </tr>
+          </thead>
+          <tbody id="itemsBody">
+            {% for item_form in formset %}
+            <tr class="item-row" id="row-{{ forloop.counter0 }}">
+              <td>
+                {{ item_form.id }}
+                <div class="ledger-wrap">
+                  {{ item_form.ledger }}
+                  <button type="button"
+                          class="quick-add-btn"
+                          title="Quick-add a new ledger"
+                          onclick="openQuickAdd(this)">+</button>
+                </div>
+                {% if item_form.ledger.errors %}
+                  <div class="text-danger small">{{ item_form.ledger.errors.0 }}</div>
+                {% endif %}
+              </td>
+              <td>
+                {{ item_form.debit }}
+                {% if item_form.debit.errors %}
+                  <div class="text-danger small">{{ item_form.debit.errors.0 }}</div>
+                {% endif %}
+              </td>
+              <td>
+                {{ item_form.credit }}
+                {% if item_form.credit.errors %}
+                  <div class="text-danger small">{{ item_form.credit.errors.0 }}</div>
+                {% endif %}
+              </td>
+              <td>{{ item_form.narration }}</td>
+              <td>{{ item_form.reference_voucher }}</td>
+              <td class="text-center">
+                {% if item_form.DELETE %}
+                  {{ item_form.DELETE }}
+                {% else %}
+                  <button type="button" class="btn btn-sm btn-outline-danger delete-btn"
+                          onclick="removeRow(this)">
+                    <i class="bi bi-x"></i>
+                  </button>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+
+          <!-- Totals row -->
+          <tfoot>
+            <tr class="total-row">
+              <td>Total</td>
+              <td class="text-end" id="totalDebit">₹0.00</td>
+              <td class="text-end" id="totalCredit">₹0.00</td>
+              <td colspan="3" id="balanceStatus"></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div><!-- /table-responsive -->
+
+      <button type="button" class="btn btn-outline-secondary btn-sm mb-4" id="addRowBtn">
+        <i class="bi bi-plus-circle me-1"></i> Add Line
+      </button>
+
+      <!-- Non-field errors from formset -->
+      {% if formset.non_form_errors %}
+      <div class="alert alert-danger py-2">
+        {% for err in formset.non_form_errors %}<div>{{ err }}</div>{% endfor %}
+      </div>
+      {% endif %}
+
+      <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary" id="saveBtn">
+          <i class="bi bi-check-lg me-1"></i> Save Voucher
+        </button>
+        <a href="{% url 'vouchers:list' %}" class="btn btn-outline-secondary">Cancel</a>
+      </div>
+
+    </form><!-- /voucherForm -->
+  </div><!-- /card-body -->
+</div><!-- /card -->
+
+
+<!-- ══════════════════════════════════════════════════════
+     QUICK-ADD LEDGER MODAL
+     ══════════════════════════════════════════════════════ -->
+<div class="modal fade" id="quickAddModal" tabindex="-1" aria-labelledby="quickAddModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-sm">
+    <div class="modal-content">
+      <div class="modal-header py-2">
+        <h6 class="modal-title" id="quickAddModalLabel">
+          <i class="bi bi-plus-circle me-1 text-primary"></i>Quick-Add Ledger
+        </h6>
+        <button type="button" class="btn-close btn-sm" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div id="qa-error" class="alert alert-danger py-2 d-none" style="font-size:.83rem;"></div>
+
+        <div class="mb-3">
+          <label class="form-label fw-semibold" style="font-size:.85rem;">Name <span class="text-danger">*</span></label>
+          <input type="text" id="qa-name" class="form-control form-control-sm"
+                 placeholder="e.g. Stationery Expense">
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-semibold" style="font-size:.85rem;">Group <span class="text-danger">*</span></label>
+          <select id="qa-group" class="form-select form-select-sm">
+            <option value="">— Select Group —</option>
+            <option value="Asset">Asset</option>
+            <option value="Liability">Liability</option>
+            <option value="Income">Income</option>
+            <option value="Expense">Expense</option>
+            <option value="Tax">Tax</option>
+          </select>
+        </div>
+        <div class="mb-1">
+          <label class="form-label fw-semibold" style="font-size:.85rem;">Opening Balance (₹)</label>
+          <input type="number" id="qa-opening" class="form-control form-control-sm"
+                 value="0.00" step="0.01" min="0">
+        </div>
+      </div>
+      <div class="modal-footer py-2">
+        <button type="button" class="btn btn-outline-secondary btn-sm"
+                data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary btn-sm" id="qa-save-btn"
+                onclick="submitQuickAdd()">
+          <i class="bi bi-plus-lg me-1"></i>Create Ledger
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+
+{% block extra_js %}
+<script>
+// ── Quick-Add Ledger ─────────────────────────────────────────────────────────
+let _qaTargetSelect = null;   // the <select> that triggered the modal
+
+function openQuickAdd(btn) {
+  // Find the ledger <select> in the same row
+  _qaTargetSelect = btn.closest("td").querySelector("select.ledger-select");
+  // Reset modal fields
+  document.getElementById("qa-name").value    = "";
+  document.getElementById("qa-group").value   = "";
+  document.getElementById("qa-opening").value = "0.00";
+  document.getElementById("qa-error").classList.add("d-none");
+  document.getElementById("qa-error").textContent = "";
+  // Show modal
+  new bootstrap.Modal(document.getElementById("quickAddModal")).show();
+}
+
+async function submitQuickAdd() {
+  const name    = document.getElementById("qa-name").value.trim();
+  const group   = document.getElementById("qa-group").value;
+  const opening = parseFloat(document.getElementById("qa-opening").value) || 0;
+  const errEl   = document.getElementById("qa-error");
+
+  if (!name) {
+    errEl.textContent = "Please enter a ledger name.";
+    errEl.classList.remove("d-none");
+    return;
+  }
+  if (!group) {
+    errEl.textContent = "Please select a group.";
+    errEl.classList.remove("d-none");
+    return;
+  }
+
+  const saveBtn = document.getElementById("qa-save-btn");
+  saveBtn.disabled = true;
+  saveBtn.textContent = "Saving…";
+
+  try {
+    const resp = await fetch("{% url 'ledger:quick_add' %}", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRFToken":  document.querySelector("[name=csrfmiddlewaretoken]").value,
+      },
+      body: JSON.stringify({
+        name:            name,
+        group:           group,
+        opening_balance: opening.toFixed(2),
+        is_active:       true,
+      }),
+    });
+
+    const data = await resp.json();
+
+    if (data.success) {
+      // Add new option to the target ledger select and select it
+      if (_qaTargetSelect) {
+        const opt = new Option(
+          `${data.name}  (${data.group})`,
+          data.id,
+          true, true
+        );
+        _qaTargetSelect.add(opt);
+        _qaTargetSelect.value = data.id;
+
+        // Also add to ALL other ledger dropdowns in the form so new rows work
+        document.querySelectorAll("select.ledger-select").forEach(sel => {
+          if (sel !== _qaTargetSelect && !sel.querySelector(`option[value="${data.id}"]`)) {
+            sel.add(new Option(`${data.name}  (${data.group})`, data.id));
+          }
+        });
+      }
+      // Close modal
+      bootstrap.Modal.getInstance(document.getElementById("quickAddModal")).hide();
+    } else {
+      const msgs = Object.values(data.errors).flat().join(" ");
+      errEl.textContent = msgs || "Could not create ledger.";
+      errEl.classList.remove("d-none");
+    }
+  } catch (e) {
+    errEl.textContent = "Network error — please try again.";
+    errEl.classList.remove("d-none");
+  } finally {
+    saveBtn.disabled = false;
+    saveBtn.innerHTML = '<i class="bi bi-plus-lg me-1"></i>Create Ledger';
+  }
+}
+
+// Allow Enter key to submit the modal
+document.addEventListener("keydown", function(e) {
+  if (e.key === "Enter" && document.getElementById("quickAddModal").classList.contains("show")) {
+    e.preventDefault();
+    submitQuickAdd();
+  }
+});
+
+
+// ── Live balance calculator ───────────────────────────────────────────────────
+function parseAmount(val) {
+  const n = parseFloat(val);
+  return isNaN(n) ? 0 : n;
+}
+
+function recalcTotals() {
+  let totalDr = 0, totalCr = 0;
+  document.querySelectorAll('#itemsBody tr.item-row').forEach(row => {
+    const delCb = row.querySelector('input[type=checkbox][name$="-DELETE"]');
+    if (delCb && delCb.checked) return;
+    totalDr += parseAmount(row.querySelector('input[name$="-debit"]')?.value);
+    totalCr += parseAmount(row.querySelector('input[name$="-credit"]')?.value);
+  });
+
+  document.getElementById('totalDebit').textContent  = '₹' + totalDr.toFixed(2);
+  document.getElementById('totalCredit').textContent = '₹' + totalCr.toFixed(2);
+
+  const statusEl = document.getElementById('balanceStatus');
+  if (totalDr === 0 && totalCr === 0) {
+    statusEl.innerHTML = '';
+  } else if (totalDr === totalCr) {
+    statusEl.innerHTML = '<span class="balanced-ok"><i class="bi bi-check-circle me-1"></i>Balanced</span>';
+  } else {
+    const diff = Math.abs(totalDr - totalCr).toFixed(2);
+    statusEl.innerHTML = `<span class="balanced-fail"><i class="bi bi-x-circle me-1"></i>Unbalanced (diff ₹${diff})</span>`;
+  }
+}
+
+document.getElementById('itemsBody').addEventListener('input',  recalcTotals);
+document.getElementById('itemsBody').addEventListener('change', recalcTotals);
+
+
+// ── Remove row ────────────────────────────────────────────────────────────────
+function removeRow(btn) {
+  const row   = btn.closest('tr');
+  const delCb = row.querySelector('input[type=checkbox][name$="-DELETE"]');
+  if (delCb) {
+    delCb.checked = true;
+    row.style.display = 'none';
+  } else {
+    row.remove();
+  }
+  recalcTotals();
+}
+
+
+// ── Add new row ───────────────────────────────────────────────────────────────
+document.getElementById('addRowBtn').addEventListener('click', function () {
+  const totalFormsInput = document.querySelector('#id_items-TOTAL_FORMS');
+  const formIdx = parseInt(totalFormsInput.value);
+  const tbody   = document.getElementById('itemsBody');
+  const firstRow = tbody.querySelector('tr.item-row');
+  if (!firstRow) return;
+
+  const newRow = firstRow.cloneNode(true);
+  newRow.id = `row-${formIdx}`;
+
+  newRow.querySelectorAll('[name], [id]').forEach(el => {
+    if (el.name) el.name = el.name.replace(/-\d+-/, `-${formIdx}-`);
+    if (el.id)   el.id   = el.id.replace(/-\d+-/, `-${formIdx}-`);
+    if (el.tagName === 'INPUT')  el.value = '';
+    if (el.tagName === 'SELECT') el.selectedIndex = 0;
+  });
+
+  // Replace DELETE checkbox with delete button for new rows
+  const delCb = newRow.querySelector('input[type=checkbox][name$="-DELETE"]');
+  if (delCb) {
+    const td = delCb.closest('td');
+    delCb.remove();
+    td.innerHTML = `<button type="button" class="btn btn-sm btn-outline-danger delete-btn"
+                            onclick="removeRow(this)">
+                      <i class="bi bi-x"></i>
+                    </button>`;
+  }
+
+  tbody.appendChild(newRow);
+  totalFormsInput.value = formIdx + 1;
+  recalcTotals();
+});
+
+// Initial calculation
+recalcTotals();
+
+
+// ── Stock Items ────────────────────────────────────────────────────────────────
+
+function calcStockRowAmount(row, idx) {
+  const qty  = parseFloat(row.querySelector('input[name$="-quantity"]')?.value) || 0;
+  const rate = parseFloat(row.querySelector('input[name$="-rate"]')?.value) || 0;
+  const amt  = qty * rate;
+  const amtCell = document.getElementById(`stock-amt-${idx}`);
+  if (amtCell) {
+    amtCell.textContent = qty > 0 && rate > 0 ? '₹' + amt.toFixed(2) : '—';
+  }
+  return amt;
+}
+
+function recalcStockTotals() {
+  let total = 0;
+  let idx = 0;
+  document.querySelectorAll('#stockBody tr.stock-row').forEach(row => {
+    const delCb = row.querySelector('input[type=checkbox][name$="-DELETE"]');
+    if (delCb && delCb.checked) { idx++; return; }
+    total += calcStockRowAmount(row, idx);
+    idx++;
+  });
+  const totalEl = document.getElementById('stockTotalAmount');
+  if (totalEl) totalEl.textContent = '₹' + total.toFixed(2);
+}
+
+// Auto-fill rate when stock item is selected
+document.getElementById('stockBody')?.addEventListener('change', async function(e) {
+  if (e.target.classList.contains('stock-item-select') && e.target.value) {
+    const row     = e.target.closest('tr');
+    const rateIn  = row?.querySelector('input[name$="-rate"]');
+    const vtype   = document.querySelector('select[name="voucher_type"]')?.value || '';
+
+    try {
+      const resp = await fetch(`/inventory/api/item/${e.target.value}/price/`);
+      if (resp.ok) {
+        const data = await resp.json();
+        if (rateIn) {
+          // Purchase voucher → use purchase_price; Sales → selling_price
+          rateIn.value = vtype === 'Sales' ? data.selling_price : data.purchase_price;
+        }
+      }
+    } catch (err) {
+      // silent fail — user can type rate manually
+    }
+    recalcStockTotals();
+  }
+  if (e.target.name?.endsWith('-quantity') || e.target.name?.endsWith('-rate')) {
+    recalcStockTotals();
+  }
+});
+
+document.getElementById('stockBody')?.addEventListener('input', recalcStockTotals);
+
+function removeStockRow(btn) {
+  const row   = btn.closest('tr');
+  const delCb = row.querySelector('input[type=checkbox][name$="-DELETE"]');
+  if (delCb) {
+    delCb.checked = true;
+    row.style.display = 'none';
+  } else {
+    row.remove();
+  }
+  recalcStockTotals();
+}
+
+document.getElementById('addStockRowBtn')?.addEventListener('click', function() {
+  const mgmt  = document.querySelector('#id_voucher_stock_items-TOTAL_FORMS');
+  if (!mgmt) return;
+  const idx   = parseInt(mgmt.value);
+  const tbody = document.getElementById('stockBody');
+  const first = tbody?.querySelector('tr.stock-row');
+  if (!first) return;
+
+  const newRow = first.cloneNode(true);
+  newRow.id = `stock-row-${idx}`;
+  newRow.querySelectorAll('[name],[id]').forEach(el => {
+    if (el.name) el.name = el.name.replace(/-\d+-/, `-${idx}-`);
+    if (el.id)   el.id   = el.id.replace(/-\d+-/, `-${idx}-`);
+    if (el.tagName === 'INPUT')  el.value = '';
+    if (el.tagName === 'SELECT') el.selectedIndex = 0;
+  });
+  const amtCell = newRow.querySelector('[id^="stock-amt-"]');
+  if (amtCell) { amtCell.id = `stock-amt-${idx}`; amtCell.textContent = '—'; }
+
+  const delCb = newRow.querySelector('input[type=checkbox][name$="-DELETE"]');
+  if (delCb) {
+    const td = delCb.closest('td');
+    delCb.remove();
+    td.innerHTML = `<button type="button" class="btn btn-sm btn-outline-danger"
+                            onclick="removeStockRow(this)">
+                      <i class="bi bi-x"></i>
+                    </button>`;
+  }
+
+  tbody.appendChild(newRow);
+  mgmt.value = idx + 1;
+  recalcStockTotals();
+});
+
+// Initial stock totals
+recalcStockTotals();
+</script>
+{% endblock %}

@@ -1,0 +1,298 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard – Akshaya Vistara{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+
+{% block content %}
+
+<!-- ══════════════════════════════════════════
+     STAT CARDS
+     ══════════════════════════════════════════ -->
+<div class="row g-3 mb-4">
+
+  <div class="col-sm-6 col-xl-3">
+    <div class="card stat-card p-3">
+      <div class="d-flex align-items-center gap-3">
+        <div class="rounded-3 p-2" style="background:#ede9fe;">
+          <i class="bi bi-receipt fs-4" style="color:#7c3aed;"></i>
+        </div>
+        <div>
+          <div class="fs-3 fw-bold lh-1">{{ total_vouchers }}</div>
+          <div class="text-muted small">Total Vouchers</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-sm-6 col-xl-3">
+    <div class="card stat-card p-3">
+      <div class="d-flex align-items-center gap-3">
+        <div class="rounded-3 p-2" style="background:#dcfce7;">
+          <i class="bi bi-journal-text fs-4" style="color:#16a34a;"></i>
+        </div>
+        <div>
+          <div class="fs-3 fw-bold lh-1">{{ total_ledgers }}</div>
+          <div class="text-muted small">Ledger Accounts</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-sm-6 col-xl-3">
+    <div class="card stat-card p-3">
+      <div class="d-flex align-items-center gap-3">
+        <div class="rounded-3 p-2" style="background:#dbeafe;">
+          <i class="bi bi-bank fs-4" style="color:#2563eb;"></i>
+        </div>
+        <div>
+          <div class="fs-3 fw-bold lh-1">₹{{ ledger_summary.Asset|floatformat:0|default:"0" }}</div>
+          <div class="text-muted small">Total Assets</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-sm-6 col-xl-3">
+    <div class="card stat-card p-3">
+      <div class="d-flex align-items-center gap-3">
+        <div class="rounded-3 p-2"
+             style="background:{% if ocr_pending %}#fef9c3{% else %}#f0fdf4{% endif %};">
+          <i class="bi bi-camera fs-4"
+             style="color:{% if ocr_pending %}#a16207{% else %}#15803d{% endif %};"></i>
+        </div>
+        <div>
+          <div class="fs-3 fw-bold lh-1">{{ ocr_pending }}</div>
+          <div class="text-muted small">
+            OCR Pending
+            {% if ocr_pending %}
+            <a href="{% url 'ocr:list' %}" class="ms-1 text-warning fw-semibold small">Review →</a>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /stat cards -->
+
+<!-- ══════════════════════════════════════════
+     QUICK ACTIONS
+     ══════════════════════════════════════════ -->
+<div class="row g-2 mb-4">
+  <div class="col-auto">
+    <a href="{% url 'vouchers:create' %}" class="btn btn-primary btn-sm">
+      <i class="bi bi-plus-circle me-1"></i> New Voucher
+    </a>
+  </div>
+  <div class="col-auto">
+    <a href="{% url 'ocr:upload' %}" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-camera me-1"></i> Scan Bill
+    </a>
+  </div>
+  <div class="col-auto">
+    <a href="{% url 'ledger:create' %}" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-journal-plus me-1"></i> New Ledger
+    </a>
+  </div>
+  <div class="col-auto">
+    <a href="{% url 'reports:profit_loss' %}" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-bar-chart-line me-1"></i> P&amp;L Report
+    </a>
+  </div>
+  <div class="col-auto">
+    <a href="{% url 'reports:balance_sheet' %}" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-journal-bookmark me-1"></i> Balance Sheet
+    </a>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     CASH FLOW CHART + RECENT VOUCHERS
+     ══════════════════════════════════════════ -->
+<div class="row g-3 mb-4">
+
+  <!-- Cash Flow Chart -->
+  <div class="col-xl-8">
+    <div class="card border-0 shadow-sm">
+      <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
+        <h6 class="mb-0"><i class="bi bi-graph-up me-2"></i>Cash Flow — Last 12 Months</h6>
+        <span class="text-muted small">Inflow vs Outflow</span>
+      </div>
+      <div class="card-body">
+        <canvas id="cashFlowChart" height="110"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Ledger groups donut -->
+  <div class="col-xl-4">
+    <div class="card border-0 shadow-sm">
+      <div class="card-header bg-white py-3">
+        <h6 class="mb-0"><i class="bi bi-pie-chart me-2"></i>Balance by Group</h6>
+      </div>
+      <div class="card-body">
+        <canvas id="ledgerChart" height="200"></canvas>
+        <div class="mt-3 small">
+          {% for label, val in ledger_summary.items %}
+          <div class="d-flex justify-content-between border-bottom py-1">
+            <span class="text-muted">{{ label }}</span>
+            <span class="fw-semibold">₹{{ val|floatformat:2 }}</span>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /charts row -->
+
+<!-- ══════════════════════════════════════════
+     RECENT VOUCHERS TABLE
+     ══════════════════════════════════════════ -->
+<div class="card border-0 shadow-sm">
+  <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
+    <h6 class="mb-0"><i class="bi bi-clock-history me-2"></i>Recent Vouchers</h6>
+    <a href="{% url 'vouchers:list' %}" class="btn btn-sm btn-outline-secondary">View All</a>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Number</th>
+            <th>Type</th>
+            <th>Date</th>
+            <th>Due Date</th>
+            <th class="text-end">Amount</th>
+            <th>Status</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for v in recent_vouchers %}
+          <tr>
+            <td><code>{{ v.number }}</code></td>
+            <td>
+              <span class="badge bg-secondary bg-opacity-10 text-secondary">
+                {{ v.voucher_type }}
+              </span>
+            </td>
+            <td>{{ v.date|date:"d M Y" }}</td>
+            <td>
+              {% if v.due_date %}
+                {% if v.due_date < today %}
+                  <span class="text-danger small fw-semibold">{{ v.due_date|date:"d M Y" }} ⚠️</span>
+                {% else %}
+                  <span class="text-muted small">{{ v.due_date|date:"d M Y" }}</span>
+                {% endif %}
+              {% else %}
+                <span class="text-muted small">—</span>
+              {% endif %}
+            </td>
+            <td class="text-end">₹{{ v.total_debit|floatformat:2 }}</td>
+            <td>
+              {% if v.is_balanced %}
+                <span class="badge badge-balanced">✔ Balanced</span>
+              {% else %}
+                <span class="badge badge-unbalanced">✘ Unbalanced</span>
+              {% endif %}
+            </td>
+            <td>
+              <a href="{% url 'vouchers:detail' v.pk %}"
+                 class="btn btn-xs btn-outline-secondary btn-sm">
+                <i class="bi bi-eye"></i>
+              </a>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="7" class="text-center text-muted py-4">
+              No vouchers yet.
+              <a href="{% url 'vouchers:create' %}">Create your first one →</a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  // ── Cash Flow Line Chart ─────────────────────────────────────────────────
+  new Chart(document.getElementById('cashFlowChart'), {
+    type: 'line',
+    data: {
+      labels: {{ cf_labels|safe }},
+      datasets: [
+        {
+          label: 'Inflow (₹)',
+          data: {{ cf_inflow|safe }},
+          borderColor: '#16a34a',
+          backgroundColor: 'rgba(22,163,74,0.08)',
+          borderWidth: 2.5,
+          pointRadius: 3,
+          tension: 0.35,
+          fill: true,
+        },
+        {
+          label: 'Outflow (₹)',
+          data: {{ cf_outflow|safe }},
+          borderColor: '#dc2626',
+          backgroundColor: 'rgba(220,38,38,0.06)',
+          borderWidth: 2.5,
+          pointRadius: 3,
+          tension: 0.35,
+          fill: true,
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { position: 'top' },
+        tooltip: {
+          callbacks: {
+            label: ctx => ' ₹' + ctx.raw.toLocaleString('en-IN', {minimumFractionDigits: 2})
+          }
+        }
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          ticks: {
+            callback: v => '₹' + (v / 1000).toFixed(0) + 'k'
+          }
+        }
+      }
+    }
+  });
+
+  // ── Donut Chart ──────────────────────────────────────────────────────────
+  new Chart(document.getElementById('ledgerChart'), {
+    type: 'doughnut',
+    data: {
+      labels: ['Asset', 'Liability', 'Income', 'Expense'],
+      datasets: [{
+        data: [
+          {{ ledger_summary.Asset|default:0 }},
+          {{ ledger_summary.Liability|default:0 }},
+          {{ ledger_summary.Income|default:0 }},
+          {{ ledger_summary.Expense|default:0 }}
+        ],
+        backgroundColor: ['#2563eb','#7c3aed','#16a34a','#dc2626'],
+        borderWidth: 0,
+        hoverOffset: 8,
+      }]
+    },
+    options: {
+      plugins: { legend: { display: false } },
+      cutout: '65%',
+    }
+  });
+</script>
+{% endblock %}
