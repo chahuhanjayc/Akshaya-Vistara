@@ -25,9 +25,11 @@ environ.Env.read_env(BASE_DIR / ".env")
 # ---------------------------------------------------------------------------
 # Core settings
 # ---------------------------------------------------------------------------
-SECRET_KEY = env("SECRET_KEY")
-DEBUG = env("DEBUG")
-ALLOWED_HOSTS = env("ALLOWED_HOSTS")
+# In production, this MUST be set in the Environment Variables.
+# We provide a dummy fallback only to prevent the server from crashing during boot.
+SECRET_KEY = env("SECRET_KEY", default="django-insecure-fallback-key-change-this-immediately")
+DEBUG = env("DEBUG", default=False)
+ALLOWED_HOSTS = env.list("ALLOWED_HOSTS", default=["*"])
 
 # ---------------------------------------------------------------------------
 # Application definition
