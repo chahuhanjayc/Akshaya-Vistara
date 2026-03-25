@@ -18,9 +18,10 @@ import logging
 from decimal import Decimal, InvalidOperation
 
 from django.contrib.auth.decorators import login_required
+from django.conf import settings
 from django.contrib import messages
 from django.db import transaction
-from django.http import JsonResponse
+from django.http import JsonResponse, FileResponse, Http404
 from django.shortcuts import render, redirect, get_object_or_404
 from django.utils import timezone
 from django.views.decorators.http import require_POST
@@ -33,6 +34,33 @@ from .forms import OCRUploadForm, OCRVerifyForm
 from . import ocr_utils
 
 logger = logging.getLogger(__name__)
+
+
+def _process_submission_synchronously(submission) -> None:
+    """Run OCR inline and transition the submission to Pending or Error."""
+    try:
+        ocr_utils.process_submission(submission)
+        submission.status = OCRSubmission.STATUS_PENDING
+    except Exception as exc:
+        logger.exception("Sync OCR failed for submission %s", submission.pk)
+        submission.ocr_error = str(exc)
+        submission.status = OCRSubmission.STATUS_ERROR
+    submission.save(update_fields=["status", "ocr_error", "updated_at"])
+
+
+def _maybe_finish_processing_submission(submission) -> None:
+    """Rescue stuck Processing submissions when async OCR is disabled."""
+    if (
+        not settings.OCR_ASYNC_ENABLED
+        and submission.status == OCRSubmission.STATUS_PROCESSING
+        and not submission.parsed_json
+    ):
+        _process_submission_synchronously(submission)
+
+
+def _guess_content_type(filename: str) -> str:
+    import mimetypes
+    return mimetypes.guess_type(filename)[0] or "application/octet-stream"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -51,21 +79,17 @@ def ocr_upload(request):
         submission.status  = OCRSubmission.STATUS_PROCESSING
         submission.save()
 
-        try:
-            from .tasks import process_ocr_submission
-            result = process_ocr_submission.delay(submission.pk)
-            submission.task_id = result.id or ""
-            submission.save(update_fields=["task_id"])
-        except Exception as exc:
-            logger.warning("Celery unavailable (%s); running OCR synchronously.", exc)
+        if settings.OCR_ASYNC_ENABLED:
             try:
-                ocr_utils.process_submission(submission)
-                submission.status = OCRSubmission.STATUS_PENDING
-            except Exception as ocr_exc:
-                logger.exception("Sync OCR failed for submission %s", submission.pk)
-                submission.ocr_error = str(ocr_exc)
-                submission.status    = OCRSubmission.STATUS_ERROR
-            submission.save(update_fields=["status", "ocr_error", "updated_at"])
+                from .tasks import process_ocr_submission
+                result = process_ocr_submission.delay(submission.pk)
+                submission.task_id = result.id or ""
+                submission.save(update_fields=["task_id"])
+            except Exception as exc:
+                logger.warning("Celery unavailable (%s); running OCR synchronously.", exc)
+                _process_submission_synchronously(submission)
+        else:
+            _process_submission_synchronously(submission)
 
         if submission.parsed_json.get("duplicate_warning"):
             messages.warning(request, submission.parsed_json["duplicate_warning"])
@@ -73,6 +97,29 @@ def ocr_upload(request):
         return redirect("ocr:verify", pk=submission.pk)
 
     return render(request, "ocr/ocr_upload.html", {"form": form})
+
+
+@login_required
+def ocr_file(request, pk):
+    company = request.current_company
+    submission = get_object_or_404(OCRSubmission, pk=pk, company=company)
+
+    if not submission.file:
+        raise Http404("No file uploaded for this submission.")
+
+    try:
+        submission.file.open("rb")
+    except FileNotFoundError as exc:
+        raise Http404("Uploaded file is not available on this server.") from exc
+
+    response = FileResponse(
+        submission.file,
+        as_attachment=False,
+        filename=submission.filename(),
+        content_type=_guess_content_type(submission.file.name),
+    )
+    response["Cache-Control"] = "private, max-age=60"
+    return response
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -83,6 +130,8 @@ def ocr_upload(request):
 def ocr_status(request, pk):
     company    = request.current_company
     submission = get_object_or_404(OCRSubmission, pk=pk, company=company)
+    _maybe_finish_processing_submission(submission)
+    submission.refresh_from_db()
     return JsonResponse({
         "status":   submission.status,
         "is_ready": submission.status == OCRSubmission.STATUS_PENDING,
@@ -100,6 +149,8 @@ def ocr_status(request, pk):
 def ocr_verify(request, pk):
     company    = request.current_company
     submission = get_object_or_404(OCRSubmission, pk=pk, company=company)
+    _maybe_finish_processing_submission(submission)
+    submission.refresh_from_db()
 
     if submission.status == OCRSubmission.STATUS_CONFIRMED:
         messages.info(request, "This submission has already been confirmed.")

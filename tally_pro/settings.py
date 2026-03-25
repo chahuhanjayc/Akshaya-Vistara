@@ -170,6 +170,9 @@ CELERY_TASK_TIME_LIMIT    = 300   # 5-minute hard limit per task
 CELERY_TASK_ALWAYS_EAGER          = env.bool("CELERY_TASK_ALWAYS_EAGER", default=False)
 CELERY_TASK_EAGER_PROPAGATES      = True
 
+# OCR processing mode
+OCR_ASYNC_ENABLED = env.bool("OCR_ASYNC_ENABLED", default=False)
+
 # ---------------------------------------------------------------------------
 # Crispy forms
 # ---------------------------------------------------------------------------

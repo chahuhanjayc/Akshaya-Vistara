@@ -90,17 +90,17 @@
     <div class="card shadow-sm mb-3">
       <div class="card-header d-flex align-items-center justify-content-between py-2">
         <span class="fw-semibold"><i class="bi bi-file-image me-1"></i>Bill Preview</span>
-        <a href="{{ submission.file.url }}" target="_blank" class="btn btn-outline-secondary btn-sm">
+        <a href="{% url 'ocr:file' submission.pk %}" target="_blank" class="btn btn-outline-secondary btn-sm">
           <i class="bi bi-box-arrow-up-right"></i> Open
         </a>
       </div>
       <div class="bill-preview-wrap">
         {% if submission.is_image %}
-          <img src="{{ submission.file.url }}" alt="Bill">
+          <img src="{% url 'ocr:file' submission.pk %}" alt="Bill">
         {% elif submission.is_pdf %}
           <div class="text-center text-muted py-4">
             <i class="bi bi-file-pdf fs-1 text-danger"></i><br>
-            <a href="{{ submission.file.url }}" target="_blank" class="btn btn-sm btn-outline-danger mt-2">Open PDF</a>
+            <a href="{% url 'ocr:file' submission.pk %}" target="_blank" class="btn btn-sm btn-outline-danger mt-2">Open PDF</a>
           </div>
         {% endif %}
       </div>
