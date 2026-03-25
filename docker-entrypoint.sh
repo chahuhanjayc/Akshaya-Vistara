@@ -1,45 +1,50 @@
 #!/bin/sh
 # docker-entrypoint.sh
-# Runs before the main CMD (Gunicorn).
-# Waits for PostgreSQL to be ready, then runs migrations.
-
 set -e
 
 echo "──────────────────────────────────────────────"
 echo "  Akshaya Vistara — Container Starting"
 echo "──────────────────────────────────────────────"
 
+# ── Debug: Check if DATABASE_URL exists ──────────────────────────────────────
+if [ -z "$DATABASE_URL" ]; then
+    echo "ERROR: DATABASE_URL is not set! Check your Render Environment variables."
+    # We don't exit here so we can see the app crash with a Django error instead
+else
+    echo "DATABASE_URL is set (hiding details for security)."
+fi
+
 # ── Wait for PostgreSQL ───────────────────────────────────────────────────────
-# This ensures migrations don't fail due to DB not being ready.
 echo "Waiting for PostgreSQL to be ready..."
-MAX_TRIES=30
+MAX_TRIES=15
 count=0
 until python -c "
 import os, psycopg2, sys
 try:
-    conn = psycopg2.connect(os.environ.get('DATABASE_URL', ''))
+    url = os.environ.get('DATABASE_URL', '')
+    if not url: sys.exit(1)
+    conn = psycopg2.connect(url, connect_timeout=3)
     conn.close()
     sys.exit(0)
-except Exception:
+except Exception as e:
+    # Print the error so we can debug it in Render logs
+    print(f'  Detail: {e}')
     sys.exit(1)
-" 2>/dev/null; do
+"; do
     count=$((count + 1))
     if [ $count -ge $MAX_TRIES ]; then
-        echo "ERROR: PostgreSQL not ready after $MAX_TRIES attempts. Aborting."
-        exit 1
+        echo "WARNING: PostgreSQL check timed out. Attempting to run migrations anyway..."
+        break
     fi
     echo "  PostgreSQL not ready yet... ($count/$MAX_TRIES)"
     sleep 2
 done
 
-echo "PostgreSQL is ready."
-
 # ── Run migrations ────────────────────────────────────────────────────────────
 echo "Running database migrations..."
-python manage.py migrate --noinput
+python manage.py migrate --noinput || echo "Migration failed! Check DB connection."
 
 echo "Startup complete. Starting Gunicorn..."
 echo "──────────────────────────────────────────────"
 
-# Execute the CMD (gunicorn)
 exec "$@"
