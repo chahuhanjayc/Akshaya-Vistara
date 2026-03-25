@@ -1,0 +1,87 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# TallyPro — docker-compose.yml
+#
+# Services:
+#   web   → Django + Gunicorn (port 8000, internal only)
+#   db    → PostgreSQL 15
+#   nginx → Reverse proxy (port 80, public)
+#
+# Windows Docker Desktop (WSL2) friendly:
+#   - All volumes use relative paths → no Windows drive letter issues
+#   - Postgres data persists in a named volume
+#   - Media and static files persist in bind mounts (./media, ./staticfiles)
+#
+# Usage:
+#   docker-compose up --build -d
+# ─────────────────────────────────────────────────────────────────────────────
+
+version: "3.9"
+
+services:
+
+  # ── PostgreSQL Database ─────────────────────────────────────────────────────
+  db:
+    image: postgres:15-alpine
+    container_name: tallypro_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB:       ${POSTGRES_DB:-tally_pro_db}
+      POSTGRES_USER:     ${POSTGRES_USER:-tally_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Please set POSTGRES_PASSWORD in .env.docker}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data   # ← persists DB across restarts
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-tally_user}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - tallypro_net
+
+  # ── Django + Gunicorn ────────────────────────────────────────────────────────
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: tallypro_web
+    restart: unless-stopped
+    env_file:
+      - .env.docker                              # ← production env vars
+    volumes:
+      - ./staticfiles:/app/staticfiles           # ← static files (shared with nginx)
+      - ./media:/app/media                       # ← uploaded bills/images (persistent)
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - tallypro_net
+    expose:
+      - "8000"                                   # ← not exposed to host directly
+
+  # ── Nginx Reverse Proxy ──────────────────────────────────────────────────────
+  nginx:
+    image: nginx:1.25-alpine
+    container_name: tallypro_nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"                                  # ← public HTTP
+      # - "443:443"                              # ← uncomment when you add SSL
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./staticfiles:/staticfiles:ro            # ← serve Django static files
+      - ./media:/media:ro                        # ← serve uploaded media files
+    depends_on:
+      - web
+    networks:
+      - tallypro_net
+
+# ── Named volumes ──────────────────────────────────────────────────────────────
+volumes:
+  postgres_data:
+    name: tallypro_postgres_data
+
+# ── Networks ───────────────────────────────────────────────────────────────────
+networks:
+  tallypro_net:
+    name: tallypro_network
+    driver: bridge

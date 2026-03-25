@@ -1,0 +1,57 @@
+services:
+  # 1. The Web Server (Django)
+  - type: web
+    name: tally-pro-web
+    env: docker
+    dockerContext: .
+    dockerfile: Dockerfile
+    plan: free
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: tally-pro-db
+          property: connectionString
+      - key: CELERY_BROKER_URL
+        fromService:
+          type: redis
+          name: tally-pro-redis
+          property: connectionString
+      - key: DEBUG
+        value: "False"
+      - key: ALLOWED_HOSTS
+        value: "*"
+      - key: SECRET_KEY
+        generateValue: true
+
+  # 2. The Celery Worker (for OCR)
+  - type: worker
+    name: tally-pro-worker
+    env: docker
+    dockerContext: .
+    dockerfile: Dockerfile
+    plan: free
+    # Override the default command to start the worker
+    dockerCommand: "celery -A tally_pro worker --loglevel=info"
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: tally-pro-db
+          property: connectionString
+      - key: CELERY_BROKER_URL
+        fromService:
+          type: redis
+          name: tally-pro-redis
+          property: connectionString
+      - key: DEBUG
+        value: "False"
+      - key: SECRET_KEY
+        generateValue: true
+
+databases:
+  - name: tally-pro-db
+    plan: free
+
+redis:
+  - name: tally-pro-redis
+    plan: free
+    ipAllowList: [] # Only allow internal access
