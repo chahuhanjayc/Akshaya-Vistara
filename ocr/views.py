@@ -86,10 +86,10 @@ def ocr_upload(request):
                 submission.task_id = result.id or ""
                 submission.save(update_fields=["task_id"])
             except Exception as exc:
-                logger.warning("Celery unavailable (%s); running OCR synchronously.", exc)
-                _process_submission_synchronously(submission)
-        else:
-            _process_submission_synchronously(submission)
+                logger.warning("Celery unavailable (%s); leaving submission for inline OCR.", exc)
+        # When async OCR is disabled, we intentionally do not process during the
+        # upload POST. The verify/status request will finish OCR inline so the
+        # upload response stays fast on Render free-tier web instances.
 
         if submission.parsed_json.get("duplicate_warning"):
             messages.warning(request, submission.parsed_json["duplicate_warning"])
