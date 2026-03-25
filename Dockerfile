@@ -1,7 +1,5 @@
 # ─────────────────────────────────────────────────────────────────────────────
-# TallyPro — Dockerfile
-# Base: Python 3.11 slim (Debian Bookworm)
-# Includes: Tesseract OCR + Poppler (for PDF) installed via apt
+# Akshaya Vistara — Production Dockerfile
 # ─────────────────────────────────────────────────────────────────────────────
 
 FROM python:3.11-slim
@@ -9,15 +7,13 @@ FROM python:3.11-slim
 # Prevent .pyc files and enable unbuffered stdout/stderr
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
+# Force Python to include the /app directory in its search path
+ENV PYTHONPATH=/app
 
 # Set working directory inside the container
 WORKDIR /app
 
 # ── System dependencies ──────────────────────────────────────────────────────
-# tesseract-ocr  → OCR engine
-# poppler-utils  → PDF → image conversion (pdf2image)
-# libpq-dev      → PostgreSQL C headers (needed to compile psycopg2)
-# gcc            → C compiler for psycopg2 and other C extensions
 RUN apt-get update && apt-get install -y --no-install-recommends \
       tesseract-ocr \
       tesseract-ocr-eng \
@@ -36,12 +32,16 @@ RUN pip install --no-cache-dir --upgrade pip \
 # ── Copy project source ──────────────────────────────────────────────────────
 COPY . .
 
+# ── Permissions & Script Prep (CRITICAL) ─────────────────────────────────────
+# We do this while still ROOT so the script can be made executable
+RUN chmod +x docker-entrypoint.sh
+
 # ── Collect static files ─────────────────────────────────────────────────────
-# Uses a dummy SECRET_KEY — real key must be provided at runtime via .env
+# We use a dummy SECRET_KEY and local PYTHONPATH for the build step
 RUN SECRET_KEY=build-time-placeholder \
-    DATABASE_URL=sqlite:////tmp/build.db \
+    DATABASE_URL=sqlite:////tmp/build_db.sqlite3 \
     DEBUG=False \
-    python manage.py collectstatic --noinput --settings=tally_pro.settings
+    PYTHONPATH=. python3 manage.py collectstatic --noinput --settings=tally_pro.settings
 
 # ── Non-root user for security ───────────────────────────────────────────────
 RUN addgroup --system appgroup && adduser --system --group appuser
@@ -52,8 +52,9 @@ USER appuser
 EXPOSE 8000
 
 # ── Entrypoint ───────────────────────────────────────────────────────────────
-COPY docker-entrypoint.sh /docker-entrypoint.sh
-ENTRYPOINT ["/docker-entrypoint.sh"]
+# We use the relative path (./) inside /app
+ENTRYPOINT ["/bin/sh", "./docker-entrypoint.sh"]
+
 CMD ["gunicorn", "tally_pro.wsgi:application", \
      "--bind", "0.0.0.0:8000", \
      "--workers", "3", \

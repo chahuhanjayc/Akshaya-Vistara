@@ -6,10 +6,11 @@
 set -e
 
 echo "──────────────────────────────────────────────"
-echo "  TallyPro — Container Starting"
+echo "  Akshaya Vistara — Container Starting"
 echo "──────────────────────────────────────────────"
 
 # ── Wait for PostgreSQL ───────────────────────────────────────────────────────
+# This ensures migrations don't fail due to DB not being ready.
 echo "Waiting for PostgreSQL to be ready..."
 MAX_TRIES=30
 count=0
@@ -36,12 +37,6 @@ echo "PostgreSQL is ready."
 # ── Run migrations ────────────────────────────────────────────────────────────
 echo "Running database migrations..."
 python manage.py migrate --noinput
-
-# ── Generate PWA icons (first run only) ──────────────────────────────────────
-if [ ! -f "static/icons/icon-192.png" ]; then
-    echo "Generating PWA icons..."
-    python manage.py generate_pwa_icons || echo "Icon generation skipped (non-critical)."
-fi
 
 echo "Startup complete. Starting Gunicorn..."
 echo "──────────────────────────────────────────────"
