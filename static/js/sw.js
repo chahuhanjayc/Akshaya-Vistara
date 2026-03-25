@@ -8,12 +8,11 @@
  *   - Navigation requests → network first, fallback to offline page
  */
 
-const CACHE_VERSION  = "tallypro-v1";
+const CACHE_VERSION  = "tallypro-v2";
 const OFFLINE_URL    = "/static/offline.html";
 
 // Static assets to pre-cache on install
 const PRECACHE_URLS = [
-  "/core/dashboard/",
   "/static/manifest.json",
   // Note: Bootstrap/Chart.js come from CDN and are cached by the browser
   // We only pre-cache our own static files here
