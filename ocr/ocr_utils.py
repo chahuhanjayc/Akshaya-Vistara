@@ -1,7 +1,7 @@
 """
 ocr/ocr_utils.py
 
-Handles all OCR processing for TallyPro bill automation.
+Handles all OCR processing for Akshaya Vistara bill automation.
 
 Pipeline:
   1. Accept uploaded file (image or PDF)

@@ -1,5 +1,5 @@
 # =============================================================================
-# backup.ps1  —  TallyPro PostgreSQL Backup Script (Windows 11 / PowerShell)
+# backup.ps1  —  Akshaya Vistara PostgreSQL Backup Script (Windows 11 / PowerShell)
 #
 # Features:
 #   - Creates a timestamped .sql dump from the running Docker postgres container
@@ -19,7 +19,7 @@ param(
 
 # ── Config ────────────────────────────────────────────────────────────────────
 $BackupDir  = ".\backups"
-$Container  = "tallypro_db"
+$Container  = "akshaya_vistara_db"
 $DbName     = "tally_pro_db"
 $DbUser     = "tally_user"
 $Timestamp  = Get-Date -Format "yyyy-MM-dd_HH-mm-ss"
@@ -60,7 +60,7 @@ if ($Restore) {
 # ── Backup mode ───────────────────────────────────────────────────────────────
 Write-Host ""
 Write-Host "==========================================" -ForegroundColor Cyan
-Write-Host "   TallyPro Database Backup" -ForegroundColor Cyan
+Write-Host "   Akshaya Vistara Database Backup" -ForegroundColor Cyan
 Write-Host "==========================================" -ForegroundColor Cyan
 Write-Host ""
 
@@ -82,14 +82,14 @@ if (-not $ContainerStatus) {
 }
 
 Write-Host "[1/3] Creating PostgreSQL dump..." -ForegroundColor Yellow
-docker exec $Container pg_dump -U $DbUser -F p -f /tmp/tallypro_backup.sql $DbName
+docker exec $Container pg_dump -U $DbUser -F p -f /tmp/akshayavistara_backup.sql $DbName
 if ($LASTEXITCODE -ne 0) {
     Write-Host "ERROR: pg_dump failed (exit code $LASTEXITCODE)" -ForegroundColor Red
     exit 1
 }
 
 Write-Host "[2/3] Copying backup to host..." -ForegroundColor Yellow
-docker cp "${Container}:/tmp/tallypro_backup.sql" $BackupFile
+docker cp "${Container}:/tmp/akshayavistara_backup.sql" $BackupFile
 if ($LASTEXITCODE -ne 0) {
     Write-Host "ERROR: docker cp failed" -ForegroundColor Red
     exit 1

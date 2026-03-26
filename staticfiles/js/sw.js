@@ -1,5 +1,5 @@
 /**
- * TallyPro Service Worker — App Shell + Offline Strategy
+ * Akshaya Vistara Service Worker — App Shell + Offline Strategy
  *
  * Strategy:
  *   - App shell (HTML skeleton, Bootstrap CSS/JS from CDN) → cache on install
@@ -8,7 +8,7 @@
  *   - Navigation requests → network first, fallback to offline page
  */
 
-const CACHE_VERSION  = "tallypro-v1";
+const CACHE_VERSION  = "akshayavistara-v1";
 const OFFLINE_URL    = "/static/offline.html";
 
 // Static assets to pre-cache on install
@@ -107,7 +107,7 @@ self.addEventListener("fetch", (event) => {
           // Offline: serve cached version if available, else offline page
           return caches.match(req).then(
             (cached) => cached || caches.match(OFFLINE_URL) || new Response(
-              "<html><body><h2>TallyPro is offline</h2>"
+              "<html><body><h2>Akshaya Vistara is offline</h2>"
               + "<p>Please check your connection and try again.</p></body></html>",
               { headers: { "Content-Type": "text/html" } }
             )
@@ -123,7 +123,7 @@ self.addEventListener("push", (event) => {
   if (!event.data) return;
   const data = event.data.json();
   event.waitUntil(
-    self.registration.showNotification(data.title || "TallyPro", {
+    self.registration.showNotification(data.title || "Akshaya Vistara", {
       body: data.body || "",
       icon: "/static/icons/icon-192.png",
       badge: "/static/icons/icon-192.png",

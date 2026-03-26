@@ -1,5 +1,5 @@
 # =============================================================================
-# setup.ps1  —  TallyPro one-click setup for Windows 11 (PowerShell 5.1+)
+# setup.ps1  —  Akshaya Vistara one-click setup for Windows 11 (PowerShell 5.1+)
 # Run this from inside the tally_pro folder:
 #   cd C:\path\to\tally_pro
 #   .\setup.ps1
@@ -7,7 +7,7 @@
 
 Write-Host ""
 Write-Host "==========================================" -ForegroundColor Cyan
-Write-Host "   TallyPro Setup Script" -ForegroundColor Cyan
+Write-Host "   Akshaya Vistara Setup Script" -ForegroundColor Cyan
 Write-Host "==========================================" -ForegroundColor Cyan
 Write-Host ""
 

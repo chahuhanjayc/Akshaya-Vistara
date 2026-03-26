@@ -32,9 +32,9 @@ class Command(BaseCommand):
             img = Image.new("RGB", (size, size), color="#4f46e5")  # Indigo background
             draw = ImageDraw.Draw(img)
 
-            # Draw a simple "T" letter for TallyPro
+            # Draw a simple "A" letter for Akshaya Vistara
             font_size = size // 2
-            text = "T"
+            text = "A"
             # Use default font (no external font needed)
             try:
                 font = ImageFont.truetype("arial.ttf", font_size)

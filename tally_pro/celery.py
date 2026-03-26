@@ -1,7 +1,7 @@
 """
 tally_pro/celery.py
 
-Celery application instance for TallyPro.
+Celery application instance for Akshaya Vistara.
 
 Start a worker (requires Redis to be running):
     celery -A tally_pro worker -l info

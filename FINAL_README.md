@@ -1,4 +1,4 @@
-# TallyPro — Complete Accounting SaaS
+# Akshaya Vistara — Complete Accounting SaaS
 ### Multi-Tenant · Double-Entry · OCR Bill Automation · Docker-Ready · PWA
 
 ---
@@ -23,7 +23,7 @@
 
 ## 1. Project Overview
 
-TallyPro is a production-ready multi-tenant accounting system built with Django.
+Akshaya Vistara is a production-ready multi-tenant accounting system built with Django.
 It enforces strict double-entry bookkeeping, automates bill entry with OCR,
 and provides financial reports — all behind a clean Bootstrap 5 SaaS UI.
 
@@ -342,7 +342,7 @@ docker-compose exec web python manage.py migrate
 **Schedule automated backups using Windows Task Scheduler:**
 
 1. Open Task Scheduler → Create Basic Task
-2. Name: `TallyPro Daily Backup`
+2. Name: `Akshaya Vistara Daily Backup`
 3. Trigger: Daily, 2:00 AM
 4. Action: Start a program
    - Program: `powershell.exe`
@@ -353,7 +353,7 @@ docker-compose exec web python manage.py migrate
 
 ## 11. PWA — Install as Desktop App
 
-TallyPro can be installed as a native-looking desktop app on Windows 11
+Akshaya Vistara can be installed as a native-looking desktop app on Windows 11
 (no separate download needed — uses the browser's built-in PWA support).
 
 ### Generate icons first
@@ -369,7 +369,7 @@ python manage.py collectstatic
 2. Click the `...` menu (top-right) → **Apps** → **Install this site as an app**
 3. Click **Install**
 
-TallyPro now appears in your Start Menu and taskbar like a native app.
+Akshaya Vistara now appears in your Start Menu and taskbar like a native app.
 
 ### Install in Chrome
 

@@ -1,6 +1,6 @@
 {
-  "name": "TallyPro — Accounting",
-  "short_name": "TallyPro",
+  "name": "Akshaya Vistara — Accounting",
+  "short_name": "Akshaya Vistara",
   "description": "Multi-company double-entry accounting with OCR bill automation",
   "start_url": "/core/dashboard/",
   "display": "standalone",

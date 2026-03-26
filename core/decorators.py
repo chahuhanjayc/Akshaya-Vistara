@@ -1,7 +1,7 @@
 """
 core/decorators.py
 
-Role-based access control for TallyPro views.
+Role-based access control for Akshaya Vistara views.
 
 Usage:
     from core.decorators import role_required

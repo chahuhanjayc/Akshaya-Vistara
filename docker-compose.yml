@@ -1,5 +1,5 @@
 # ─────────────────────────────────────────────────────────────────────────────
-# TallyPro — docker-compose.yml
+# Akshaya Vistara — docker-compose.yml
 #
 # Services:
 #   web   → Django + Gunicorn (port 8000, internal only)
@@ -22,7 +22,7 @@ services:
   # ── PostgreSQL Database ─────────────────────────────────────────────────────
   db:
     image: postgres:15-alpine
-    container_name: tallypro_db
+    container_name: akshaya_vistara_db
     restart: unless-stopped
     environment:
       POSTGRES_DB:       ${POSTGRES_DB:-tally_pro_db}
@@ -36,14 +36,14 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - tallypro_net
+      - akshaya_vistara_net
 
   # ── Django + Gunicorn ────────────────────────────────────────────────────────
   web:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: tallypro_web
+    container_name: akshaya_vistara_web
     restart: unless-stopped
     env_file:
       - .env.docker                              # ← production env vars
@@ -54,14 +54,14 @@ services:
       db:
         condition: service_healthy
     networks:
-      - tallypro_net
+      - akshaya_vistara_net
     expose:
       - "8000"                                   # ← not exposed to host directly
 
   # ── Nginx Reverse Proxy ──────────────────────────────────────────────────────
   nginx:
     image: nginx:1.25-alpine
-    container_name: tallypro_nginx
+    container_name: akshaya_vistara_nginx
     restart: unless-stopped
     ports:
       - "80:80"                                  # ← public HTTP
@@ -73,15 +73,15 @@ services:
     depends_on:
       - web
     networks:
-      - tallypro_net
+      - akshaya_vistara_net
 
 # ── Named volumes ──────────────────────────────────────────────────────────────
 volumes:
   postgres_data:
-    name: tallypro_postgres_data
+    name: akshaya_vistara_postgres_data
 
 # ── Networks ───────────────────────────────────────────────────────────────────
 networks:
-  tallypro_net:
-    name: tallypro_network
+  akshaya_vistara_net:
+    name: akshaya_vistara_network
     driver: bridge
